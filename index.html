@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>CEDIS Veracruz · Sistema de Pedidos</title>
+<link rel="icon" href="data:,">
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.24.7/babel.min.js"></script>
+<script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #F5F7FA; --surface: #FFFFFF; --primary: #0B4F6C; --primary-dark: #073B52;
+    --accent: #E8871E; --success: #1E8A5F; --danger: #C74B3F;
+    --text: #1A2733; --text-muted: #63748A; --border: #E1E6EB;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    color: var(--text);
+  }
+  #root { min-height: 100vh; }
+  .pcx-shell { max-width: 980px; margin: 0 auto; padding: 16px; }
+  .pcx-topbar { display: flex; align-items: center; justify-content: space-between; padding: 14px 18px; background: var(--primary); color: white; border-radius: 14px; margin-bottom: 16px; }
+  .pcx-brand { display: flex; align-items: center; gap: 10px; font-weight: 700; }
+  .pcx-brand-sub { font-size: 11.5px; opacity: 0.8; font-weight: 500; }
+  .pcx-iconbtn { background: rgba(255,255,255,0.12); border: none; color: white; width: 34px; height: 34px; border-radius: 9px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; }
+  .pcx-iconbtn:hover { background: rgba(255,255,255,0.22); }
+  .pcx-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; margin-bottom: 14px; }
+  .pcx-h1 { font-size: 20px; font-weight: 800; margin: 0 0 4px 0; }
+  .pcx-h2 { font-size: 15px; font-weight: 700; margin: 0 0 10px 0; }
+  .pcx-muted { color: var(--text-muted); font-size: 13px; }
+  .pcx-btn { border: none; border-radius: 10px; padding: 11px 16px; font-weight: 700; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; justify-content: center; }
+  .pcx-btn:hover { filter: brightness(0.95); }
+  .pcx-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .pcx-btn-primary { background: var(--primary); color: white; }
+  .pcx-btn-accent { background: var(--accent); color: white; }
+  .pcx-btn-ghost { background: transparent; color: var(--primary); border: 1.5px solid var(--border); }
+  .pcx-btn-danger { background: transparent; color: var(--danger); border: 1.5px solid #F2D3D0; }
+  .pcx-btn-block { width: 100%; }
+  .pcx-input, .pcx-select { width: 100%; padding: 11px 12px; border-radius: 10px; border: 1.5px solid var(--border); font-size: 14px; font-family: inherit; background: white; color: var(--text); }
+  .pcx-input:focus, .pcx-select:focus { outline: none; border-color: var(--primary); }
+  .pcx-role-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 560px) { .pcx-role-grid { grid-template-columns: 1fr; } }
+  .pcx-role-card { background: var(--surface); border: 1.5px solid var(--border); border-radius: 16px; padding: 24px 18px; text-align: center; cursor: pointer; }
+  .pcx-role-card:hover { border-color: var(--primary); box-shadow: 0 4px 16px rgba(11,79,108,0.08); }
+  .pcx-role-icon { width: 52px; height: 52px; border-radius: 14px; display: flex; align-items: center; justify-content: center; margin: 0 auto 12px auto; font-size: 24px; }
+  .pcx-tabs { display: flex; gap: 6px; margin-bottom: 14px; overflow-x: auto; }
+  .pcx-tab { padding: 9px 14px; border-radius: 10px; font-size: 13.5px; font-weight: 700; cursor: pointer; white-space: nowrap; border: 1.5px solid var(--border); background: white; color: var(--text-muted); }
+  .pcx-tab.active { background: var(--primary); border-color: var(--primary); color: white; }
+  .pcx-badge { display: inline-flex; align-items: center; gap: 5px; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 700; }
+  .pcx-search-row { position: relative; margin-bottom: 12px; }
+  .pcx-search-row span { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted); }
+  .pcx-search-row input { padding-left: 34px; }
+  .pcx-item-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 4px; border-bottom: 1px solid var(--border); }
+  .pcx-item-row:last-child { border-bottom: none; }
+  .pcx-item-name { font-weight: 700; font-size: 13.5px; }
+  .pcx-item-meta { font-size: 12px; color: var(--text-muted); }
+  .pcx-qtybox { display: flex; align-items: center; gap: 8px; }
+  .pcx-qtybox button { width: 28px; height: 28px; border-radius: 8px; border: 1.5px solid var(--border); background: white; cursor: pointer; }
+  .pcx-qtybox span { min-width: 24px; text-align: center; font-weight: 700; font-size: 13.5px; }
+  .pcx-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  .pcx-table th { text-align: left; padding: 8px 10px; background: #F0F3F6; color: var(--text-muted); font-weight: 700; font-size: 11.5px; text-transform: uppercase; }
+  .pcx-table td { padding: 9px 10px; border-bottom: 1px solid var(--border); }
+  .pcx-table-wrap { overflow-x: auto; }
+  .pcx-folio-card { border: 1.5px solid var(--border); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .pcx-folio-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; flex-wrap: wrap; gap: 8px; cursor: pointer; }
+  .pcx-folio-id { font-weight: 800; font-size: 14.5px; }
+  .pcx-empty { text-align: center; padding: 40px 16px; color: var(--text-muted); }
+  .pcx-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  @media (max-width: 560px) { .pcx-grid-2 { grid-template-columns: 1fr; } }
+  .pcx-toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--text); color: white; padding: 12px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 600; z-index: 999; box-shadow: 0 6px 20px rgba(0,0,0,0.2); max-width: 90%; }
+  .pcx-stat { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 14px; }
+  .pcx-stat-num { font-size: 22px; font-weight: 800; color: var(--primary); }
+  .pcx-stat-label { font-size: 12px; color: var(--text-muted); font-weight: 600; }
+  .pcx-link { color: var(--primary); font-weight: 700; font-size: 13px; cursor: pointer; text-decoration: underline; }
+  .pcx-bars { display: flex; align-items: flex-end; gap: 10px; height: 220px; padding: 10px 4px 0 4px; overflow-x: auto; }
+  .pcx-bar-col { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-width: 46px; height: 100%; }
+  .pcx-bar { width: 30px; background: var(--primary); border-radius: 6px 6px 0 0; }
+  .pcx-bar-val { font-size: 11px; font-weight: 700; margin-bottom: 3px; }
+  .pcx-bar-lbl { font-size: 10px; color: var(--text-muted); margin-top: 6px; text-align: center; max-width: 60px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+</style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useMemo, useCallback } = React;
+
+const ADMIN_PIN = "NETO-2026"; // Cambia este código si quieres otro PIN de administrador
+
+const ESTATUS = ["Pendiente", "Confirmado", "En tránsito", "Entregado", "Cancelado"];
+const ESTATUS_STYLE = {
+  "Pendiente":   { bg: "#FFF3E0", fg: "#B5650C", icon: "⏳" },
+  "Confirmado":  { bg: "#E6F4EC", fg: "#1E8A5F", icon: "✅" },
+  "En tránsito": { bg: "#E8F0FB", fg: "#0B4F6C", icon: "🚚" },
+  "Entregado":   { bg: "#EAF7EE", fg: "#1E8A5F", icon: "✅" },
+  "Cancelado":   { bg: "#FBEAEA", fg: "#C74B3F", icon: "❌" },
+};
+
+function Toast({ message, onClose }) {
+  useEffect(() => { if (!message) return; const t = setTimeout(onClose, 3200); return () => clearTimeout(t); }, [message]);
+  if (!message) return null;
+  return <div className="pcx-toast">⚠️ {message}</div>;
+}
+
+function StatusBadge({ estatus }) {
+  const s = ESTATUS_STYLE[estatus] || ESTATUS_STYLE["Pendiente"];
+  return <span className="pcx-badge" style={{ background: s.bg, color: s.fg }}>{s.icon} {estatus}</span>;
+}
+
+function App() {
+  const [apiUrl, setApiUrl] = useState(localStorage.getItem("cedis_api_url") || "");
+  const [apiUrlInput, setApiUrlInput] = useState(localStorage.getItem("cedis_api_url") || "");
+  const [showConfig, setShowConfig] = useState(!localStorage.getItem("cedis_api_url"));
+  const [role, setRole] = useState(null);
+  const [toast, setToast] = useState("");
+
+  const notify = useCallback((msg) => setToast(msg), []);
+
+  const saveApiUrl = (url) => {
+    setApiUrl(url);
+    localStorage.setItem("cedis_api_url", url);
+  };
+
+  const call = useCallback(async (params) => {
+    if (!apiUrl) throw new Error("Primero configura la URL del sistema (ícono de engranaje).");
+    const url = apiUrl + "?" + new URLSearchParams(params).toString();
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  }, [apiUrl]);
+
+  const post = useCallback(async (body) => {
+    if (!apiUrl) throw new Error("Primero configura la URL del sistema (ícono de engranaje).");
+    const res = await fetch(apiUrl, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json();
+    if (data && data.error) throw new Error(data.error);
+    return data;
+  }, [apiUrl]);
+
+  return (
+    <div className="pcx-shell">
+      <div className="pcx-topbar">
+        <div>
+          <div className="pcx-brand">📦 CEDIS Veracruz</div>
+          <div className="pcx-brand-sub">Sistema de pedidos y existencias</div>
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          {role && <button className="pcx-iconbtn" onClick={() => setRole(null)} title="Salir">🚪</button>}
+          <button className="pcx-iconbtn" onClick={() => setShowConfig(true)} title="Configuración">⚙️</button>
+        </div>
+      </div>
+
+      {showConfig && (
+        <div className="pcx-card" style={{ borderColor: "var(--primary)" }}>
+          <div className="pcx-h2">Configuración del sistema</div>
+          <p className="pcx-muted" style={{ marginBottom: 10 }}>Pega la URL de tu Google Apps Script (Web App), termina en /exec. Se guarda en este navegador.</p>
+          <input className="pcx-input" placeholder="https://script.google.com/macros/s/AKfycb.../exec"
+            value={apiUrlInput} onChange={(e) => setApiUrlInput(e.target.value)} style={{ marginBottom: 10 }} />
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="pcx-btn pcx-btn-primary" disabled={!apiUrlInput.trim()}
+              onClick={() => { saveApiUrl(apiUrlInput.trim()); setShowConfig(false); notify("URL guardada"); }}>Guardar</button>
+            {apiUrl && <button className="pcx-btn pcx-btn-ghost" onClick={() => setShowConfig(false)}>Cancelar</button>}
+          </div>
+        </div>
+      )}
+
+      {!apiUrl && !showConfig && (
+        <div className="pcx-card" style={{ borderColor: "#F2D9B8", background: "#FFF8EF" }}>
+          <div style={{ fontWeight: 700, fontSize: 13.5 }}>⚠️ Falta configurar el sistema</div>
+          <div className="pcx-muted">Toca ⚙️ arriba y pega la URL de tu Apps Script.</div>
+        </div>
+      )}
+
+      {!role && apiUrl && !showConfig && <RoleSelect onSelect={setRole} />}
+      {role === "gerente" && <GerenteFlow call={call} post={post} notify={notify} onExit={() => setRole(null)} />}
+      {role === "admin" && <AdminFlow call={call} post={post} notify={notify} onExit={() => setRole(null)} />}
+
+      <Toast message={toast} onClose={() => setToast("")} />
+    </div>
+  );
+}
+
+function RoleSelect({ onSelect }) {
+  const [pin, setPin] = useState("");
+  const [tryAdmin, setTryAdmin] = useState(false);
+  const [err, setErr] = useState("");
+
+  return (
+    <div>
+      <div className="pcx-card" style={{ textAlign: "center", background: "linear-gradient(135deg,#0B4F6C,#0E6485)", color: "white", border: "none" }}>
+        <div className="pcx-h1" style={{ color: "white" }}>¿Cómo entras hoy?</div>
+        <div style={{ opacity: 0.85, fontSize: 13.5 }}>Elige tu perfil para continuar</div>
+      </div>
+      <div className="pcx-role-grid">
+        <div className="pcx-role-card" onClick={() => onSelect("gerente")}>
+          <div className="pcx-role-icon" style={{ background: "#E8F0FB" }}>🏬</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>Gerente de tienda</div>
+          <div className="pcx-muted">Consulta existencias y pide mercancía</div>
+        </div>
+        <div className="pcx-role-card" onClick={() => setTryAdmin(true)}>
+          <div className="pcx-role-icon" style={{ background: "#FFF3E0" }}>🛡️</div>
+          <div style={{ fontWeight: 800, fontSize: 15 }}>Administrador</div>
+          <div className="pcx-muted">Carga existencias y gestiona pedidos</div>
+        </div>
+      </div>
+      {tryAdmin && (
+        <div className="pcx-card">
+          <div className="pcx-h2">Código de administrador</div>
+          <input className="pcx-input" type="password" placeholder="Código" value={pin}
+            onChange={(e) => { setPin(e.target.value); setErr(""); }} style={{ marginBottom: 8 }} />
+          {err && <div style={{ color: "var(--danger)", fontSize: 12.5, marginBottom: 8 }}>{err}</div>}
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="pcx-btn pcx-btn-primary" onClick={() => pin === ADMIN_PIN ? onSelect("admin") : setErr("Código incorrecto")}>Entrar</button>
+            <button className="pcx-btn pcx-btn-ghost" onClick={() => { setTryAdmin(false); setPin(""); setErr(""); }}>Cancelar</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ============= GERENTE ============= */
+
+function GerenteFlow({ call, post, notify, onExit }) {
+  const [eco, setEco] = useState(localStorage.getItem("cedis_last_eco") || "");
+  const [tienda, setTienda] = useState(null);
+  const [loading, setLoading] = useState(false);
+  const [err, setErr] = useState("");
+
+  const login = async () => {
+    if (!eco.trim()) return;
+    setLoading(true); setErr("");
+    try {
+      const t = await call({ action: "getTiendaByEco", eco: eco.trim() });
+      setTienda(t);
+      localStorage.setItem("cedis_last_eco", eco.trim());
+    } catch (e) { setErr(e.message || "No se pudo validar el número económico"); }
+    finally { setLoading(false); }
+  };
+
+  if (!tienda) {
+    return (
+      <div className="pcx-card">
+        <div className="pcx-h2">Ingresa tu número económico (ECO)</div>
+        <p className="pcx-muted" style={{ marginBottom: 12 }}>Con tu ECO identificamos automáticamente tu tienda.</p>
+        <input className="pcx-input" placeholder="Ej. 2865" value={eco} onChange={(e) => setEco(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && login()} style={{ marginBottom: 10 }} />
+        {err && <div style={{ color: "var(--danger)", fontSize: 12.5, marginBottom: 10 }}>{err}</div>}
+        <div style={{ display: "flex", gap: 8 }}>
+          <button className="pcx-btn pcx-btn-primary" onClick={login} disabled={loading}>{loading ? "Validando..." : "Entrar →"}</button>
+          <button className="pcx-btn pcx-btn-ghost" onClick={onExit}>Cambiar perfil</button>
+        </div>
+      </div>
+    );
+  }
+  return <GerenteDashboard tienda={tienda} call={call} post={post} notify={notify} onExit={() => setTienda(null)} />;
+}
+
+function GerenteDashboard({ tienda, call, post, notify, onExit }) {
+  const [tab, setTab] = useState("catalogo");
+  return (
+    <div>
+      <div className="pcx-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+        <div>
+          <div style={{ fontWeight: 800, fontSize: 15.5 }}>{tienda.Nombre_Tienda}</div>
+          <div className="pcx-muted">ECO {tienda.ECO} · {tienda.Zona} · {tienda.Region}</div>
+        </div>
+        <span className="pcx-link" onClick={onExit}>Cambiar tienda</span>
+      </div>
+      <div className="pcx-tabs">
+        <div className={`pcx-tab ${tab === "catalogo" ? "active" : ""}`} onClick={() => setTab("catalogo")}>Solicitar mercancía</div>
+        <div className={`pcx-tab ${tab === "pedidos" ? "active" : ""}`} onClick={() => setTab("pedidos")}>Mis pedidos</div>
+      </div>
+      {tab === "catalogo" && <CatalogoTab tienda={tienda} call={call} post={post} notify={notify} />}
+      {tab === "pedidos" && <MisPedidosTab tienda={tienda} call={call} notify={notify} />}
+    </div>
+  );
+}
+
+function CatalogoTab({ tienda, call, post, notify }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [cart, setCart] = useState({});
+  const [sending, setSending] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setItems(await call({ action: "getExistencias" })); }
+    catch (e) { notify(e.message); } finally { setLoading(false); }
+  }, [call, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    if (!q.trim()) return items;
+    const s = q.trim().toLowerCase();
+    return items.filter(it => String(it.Codigo).toLowerCase().includes(s) || String(it.Descripcion).toLowerCase().includes(s));
+  }, [items, q]);
+
+  const addToCart = (item) => setCart(prev => {
+    const cur = prev[item.Codigo];
+    return { ...prev, [item.Codigo]: { item, cantidad: cur ? cur.cantidad + 1 : 1 } };
+  });
+  const changeQty = (codigo, delta) => setCart(prev => {
+    const cur = prev[codigo]; if (!cur) return prev;
+    const next = cur.cantidad + delta;
+    if (next <= 0) { const c = { ...prev }; delete c[codigo]; return c; }
+    return { ...prev, [codigo]: { ...cur, cantidad: next } };
+  });
+  const removeFromCart = (codigo) => setCart(prev => { const c = { ...prev }; delete c[codigo]; return c; });
+
+  const cartList = Object.values(cart);
+  const cartCount = cartList.reduce((a, c) => a + c.cantidad, 0);
+
+  const enviarPedido = async () => {
+    if (cartList.length === 0) return;
+    setSending(true);
+    try {
+      const res = await post({ action: "crearPedido", eco: tienda.ECO,
+        items: cartList.map(c => ({ Codigo: c.item.Codigo, Descripcion: c.item.Descripcion, Cantidad: c.cantidad })) });
+      notify(`Pedido enviado. Tu folio es ${res.folio}`);
+      setCart({});
+    } catch (e) { notify(e.message); } finally { setSending(false); }
+  };
+
+  return (
+    <div>
+      <div className="pcx-search-row"><span>🔍</span>
+        <input className="pcx-input" placeholder="Buscar por código o descripción..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="pcx-card" style={{ maxHeight: 420, overflowY: "auto" }}>
+        {loading && <div className="pcx-empty">Cargando existencias...</div>}
+        {!loading && filtered.length === 0 && <div className="pcx-empty">Sin resultados</div>}
+        {!loading && filtered.slice(0, 200).map((it) => (
+          <div className="pcx-item-row" key={it.Codigo}>
+            <div style={{ minWidth: 0 }}>
+              <div className="pcx-item-name">{it.Descripcion}</div>
+              <div className="pcx-item-meta">Código {it.Codigo} · Disponible: {it.Existencias} {it.Unidad || ""}</div>
+            </div>
+            {cart[it.Codigo] ? (
+              <div className="pcx-qtybox">
+                <button onClick={() => changeQty(it.Codigo, -1)}>−</button>
+                <span>{cart[it.Codigo].cantidad}</span>
+                <button onClick={() => changeQty(it.Codigo, 1)}>+</button>
+              </div>
+            ) : <button className="pcx-btn pcx-btn-ghost" onClick={() => addToCart(it)}>+ Agregar</button>}
+          </div>
+        ))}
+      </div>
+      {cartCount > 0 && (
+        <div className="pcx-card" style={{ borderColor: "var(--accent)", position: "sticky", bottom: 12 }}>
+          <div className="pcx-h2">Tu pedido ({cartCount} {cartCount === 1 ? "artículo" : "artículos"})</div>
+          {cartList.map(c => (
+            <div className="pcx-item-row" key={c.item.Codigo}>
+              <div><div className="pcx-item-name">{c.item.Descripcion}</div><div className="pcx-item-meta">Cantidad: {c.cantidad}</div></div>
+              <button className="pcx-btn pcx-btn-danger" onClick={() => removeFromCart(c.item.Codigo)}>🗑️</button>
+            </div>
+          ))}
+          <button className="pcx-btn pcx-btn-accent pcx-btn-block" style={{ marginTop: 10 }} onClick={enviarPedido} disabled={sending}>
+            {sending ? "Enviando..." : "Enviar pedido"}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MisPedidosTab({ tienda, call, notify }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await call({ action: "getPedidosByEco", eco: tienda.ECO })); }
+    catch (e) { notify(e.message); } finally { setLoading(false); }
+  }, [call, notify, tienda.ECO]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const folios = useMemo(() => {
+    const map = {};
+    rows.forEach(r => {
+      if (!map[r.Folio]) map[r.Folio] = { folio: r.Folio, fecha: r.Fecha_Solicitud, estatus: r.Estatus, items: [] };
+      map[r.Folio].items.push(r); map[r.Folio].estatus = r.Estatus;
+    });
+    return Object.values(map).sort((a, b) => (a.folio < b.folio ? 1 : -1));
+  }, [rows]);
+
+  return (
+    <div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button className="pcx-btn pcx-btn-ghost" onClick={load}>🔄 Actualizar</button>
+      </div>
+      {loading && <div className="pcx-empty">Cargando pedidos...</div>}
+      {!loading && folios.length === 0 && <div className="pcx-empty">Aún no tienes pedidos registrados</div>}
+      {!loading && folios.map(f => (
+        <div className="pcx-folio-card" key={f.folio}>
+          <div className="pcx-folio-head"><div className="pcx-folio-id">{f.folio}</div><StatusBadge estatus={f.estatus} /></div>
+          <div className="pcx-muted" style={{ marginBottom: 6 }}>{f.fecha}</div>
+          {f.items.map((it, idx) => (
+            <div key={idx} style={{ fontSize: 13, padding: "4px 0", borderTop: idx === 0 ? "none" : "1px dashed var(--border)" }}>
+              {it.Descripcion} — {it.Cantidad_Solicitada}
+              {it.Cantidad_Confirmada !== "" && it.Cantidad_Confirmada !== undefined && Number(it.Cantidad_Confirmada) !== Number(it.Cantidad_Solicitada) ? ` (confirmado: ${it.Cantidad_Confirmada})` : ""}
+            </div>
+          ))}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/* ============= ADMIN ============= */
+
+function AdminFlow({ call, post, notify, onExit }) {
+  const [tab, setTab] = useState("resumen");
+  return (
+    <div>
+      <div className="pcx-tabs">
+        <div className={`pcx-tab ${tab === "resumen" ? "active" : ""}`} onClick={() => setTab("resumen")}>Resumen</div>
+        <div className={`pcx-tab ${tab === "pedidos" ? "active" : ""}`} onClick={() => setTab("pedidos")}>Pedidos</div>
+        <div className={`pcx-tab ${tab === "existencias" ? "active" : ""}`} onClick={() => setTab("existencias")}>Existencias</div>
+      </div>
+      {tab === "resumen" && <ResumenTab call={call} notify={notify} />}
+      {tab === "pedidos" && <PedidosAdminTab call={call} post={post} notify={notify} />}
+      {tab === "existencias" && <ExistenciasAdminTab call={call} post={post} notify={notify} />}
+    </div>
+  );
+}
+
+function ResumenTab({ call, notify }) {
+  const [resumen, setResumen] = useState([]);
+  const [pedidos, setPedidos] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r, p] = await Promise.all([call({ action: "getResumenPorTienda" }), call({ action: "getPedidosAdmin" })]);
+      setResumen(r); setPedidos(p);
+    } catch (e) { notify(e.message); } finally { setLoading(false); }
+  }, [call, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const totalFolios = new Set(pedidos.map(p => p.Folio)).size;
+  const totalPendientes = new Set(pedidos.filter(p => p.Estatus === "Pendiente").map(p => p.Folio)).size;
+
+  const chartData = useMemo(() =>
+    [...resumen].sort((a, b) => b.TotalArticulosSolicitados - a.TotalArticulosSolicitados).slice(0, 10),
+    [resumen]);
+  const maxVal = Math.max(1, ...chartData.map(r => r.TotalArticulosSolicitados));
+
+  const exportExcel = () => {
+    const wb = XLSX.utils.book_new();
+    const wsResumen = XLSX.utils.json_to_sheet(resumen.map(r => ({
+      ECO: r.ECO, Tienda: r.Tienda, Region: r.Region, Zona: r.Zona,
+      "Folios totales": r.TotalFolios, "Folios pendientes": r.FoliosPendientes, "Artículos solicitados": r.TotalArticulosSolicitados,
+    })));
+    XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen por tienda");
+    const wsDetalle = XLSX.utils.json_to_sheet(pedidos.map(p => ({
+      Folio: p.Folio, Fecha: p.Fecha_Solicitud, ECO: p.ECO, Tienda: p.Tienda, Region: p.Region, Zona: p.Zona,
+      Codigo: p.Codigo_Articulo, Descripcion: p.Descripcion, "Cant. solicitada": p.Cantidad_Solicitada,
+      "Cant. confirmada": p.Cantidad_Confirmada, Estatus: p.Estatus, "Fecha estatus": p.Fecha_Estatus, Comentario: p.Comentario_Admin,
+    })));
+    XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle de pedidos");
+    XLSX.writeFile(wb, `Resumen_Pedidos_CEDIS_${new Date().toISOString().slice(0,10)}.xlsx`);
+    notify("Excel exportado");
+  };
+
+  return (
+    <div>
+      <div className="pcx-grid-2" style={{ marginBottom: 12 }}>
+        <div className="pcx-stat"><div className="pcx-stat-num">{totalFolios}</div><div className="pcx-stat-label">Folios totales</div></div>
+        <div className="pcx-stat"><div className="pcx-stat-num">{totalPendientes}</div><div className="pcx-stat-label">Folios pendientes</div></div>
+      </div>
+      <div className="pcx-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10, flexWrap: "wrap", gap: 8 }}>
+          <div className="pcx-h2" style={{ margin: 0 }}>📊 Top tiendas por artículos solicitados</div>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button className="pcx-btn pcx-btn-ghost" onClick={load}>🔄</button>
+            <button className="pcx-btn pcx-btn-primary" onClick={exportExcel} disabled={resumen.length === 0}>⬇️ Exportar Excel</button>
+          </div>
+        </div>
+        {loading && <div className="pcx-empty">Cargando...</div>}
+        {!loading && chartData.length > 0 && (
+          <div className="pcx-bars">
+            {chartData.map(r => (
+              <div className="pcx-bar-col" key={r.ECO}>
+                <div className="pcx-bar-val">{r.TotalArticulosSolicitados}</div>
+                <div className="pcx-bar" style={{ height: `${(r.TotalArticulosSolicitados / maxVal) * 160}px` }}></div>
+                <div className="pcx-bar-lbl">{r.Tienda}</div>
+              </div>
+            ))}
+          </div>
+        )}
+        {!loading && chartData.length === 0 && <div className="pcx-empty">Aún no hay pedidos registrados</div>}
+      </div>
+      <div className="pcx-card">
+        <div className="pcx-h2">Detalle por tienda</div>
+        <div className="pcx-table-wrap">
+          <table className="pcx-table">
+            <thead><tr><th>ECO</th><th>Tienda</th><th>Zona</th><th>Folios</th><th>Pendientes</th><th>Artículos</th></tr></thead>
+            <tbody>{resumen.map(r => (
+              <tr key={r.ECO}><td>{r.ECO}</td><td>{r.Tienda}</td><td>{r.Zona}</td><td>{r.TotalFolios}</td><td>{r.FoliosPendientes}</td><td>{r.TotalArticulosSolicitados}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PedidosAdminTab({ call, post, notify }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [filterEstatus, setFilterEstatus] = useState("Todos");
+  const [q, setQ] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await call({ action: "getPedidosAdmin" })); }
+    catch (e) { notify(e.message); } finally { setLoading(false); }
+  }, [call, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const folios = useMemo(() => {
+    const map = {};
+    rows.forEach(r => {
+      if (!map[r.Folio]) map[r.Folio] = { folio: r.Folio, fecha: r.Fecha_Solicitud, eco: r.ECO, tienda: r.Tienda, zona: r.Zona, estatus: r.Estatus, items: [] };
+      map[r.Folio].items.push(r); map[r.Folio].estatus = r.Estatus;
+    });
+    let list = Object.values(map).sort((a, b) => (a.folio < b.folio ? 1 : -1));
+    if (filterEstatus !== "Todos") list = list.filter(f => f.estatus === filterEstatus);
+    if (q.trim()) { const s = q.trim().toLowerCase(); list = list.filter(f => f.folio.toLowerCase().includes(s) || f.tienda.toLowerCase().includes(s) || String(f.eco).includes(s)); }
+    return list;
+  }, [rows, filterEstatus, q]);
+
+  return (
+    <div>
+      <div className="pcx-card">
+        <div className="pcx-grid-2">
+          <div className="pcx-search-row" style={{ margin: 0 }}><span>🔍</span>
+            <input className="pcx-input" placeholder="Buscar folio, tienda o ECO..." value={q} onChange={(e) => setQ(e.target.value)} />
+          </div>
+          <select className="pcx-select" value={filterEstatus} onChange={(e) => setFilterEstatus(e.target.value)}>
+            <option>Todos</option>{ESTATUS.map(s => <option key={s}>{s}</option>)}
+          </select>
+        </div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+        <button className="pcx-btn pcx-btn-ghost" onClick={load}>🔄 Actualizar</button>
+      </div>
+      {loading && <div className="pcx-empty">Cargando pedidos...</div>}
+      {!loading && folios.length === 0 && <div className="pcx-empty">No hay pedidos que coincidan</div>}
+      {!loading && folios.map(f => <FolioAdminCard key={f.folio} folio={f} post={post} notify={notify} onSaved={load} />)}
+    </div>
+  );
+}
+
+function FolioAdminCard({ folio, post, notify, onSaved }) {
+  const [open, setOpen] = useState(false);
+  const [estatus, setEstatus] = useState(folio.estatus);
+  const [comentario, setComentario] = useState("");
+  const [cantidades, setCantidades] = useState(() => {
+    const o = {}; folio.items.forEach(it => { o[it.Codigo_Articulo] = it.Cantidad_Confirmada || it.Cantidad_Solicitada; }); return o;
+  });
+  const [saving, setSaving] = useState(false);
+
+  const guardar = async () => {
+    setSaving(true);
+    try {
+      await post({ action: "actualizarEstatus", folio: folio.folio, estatus, comentario, cantidadesConfirmadas: cantidades });
+      notify(`Folio ${folio.folio} actualizado a "${estatus}"`);
+      onSaved();
+    } catch (e) { notify(e.message); } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="pcx-folio-card">
+      <div className="pcx-folio-head" onClick={() => setOpen(!open)}>
+        <div><div className="pcx-folio-id">{folio.folio} · {folio.tienda}</div><div className="pcx-muted">ECO {folio.eco} · {folio.zona} · {folio.fecha}</div></div>
+        <StatusBadge estatus={folio.estatus} />
+      </div>
+      {open && (
+        <div style={{ marginTop: 10 }}>
+          <div className="pcx-table-wrap" style={{ marginBottom: 10 }}>
+            <table className="pcx-table">
+              <thead><tr><th>Código</th><th>Descripción</th><th>Solicitado</th><th>Confirmar</th></tr></thead>
+              <tbody>{folio.items.map((it, idx) => (
+                <tr key={idx}><td>{it.Codigo_Articulo}</td><td>{it.Descripcion}</td><td>{it.Cantidad_Solicitada}</td>
+                  <td style={{ width: 90 }}>
+                    <input className="pcx-input" type="number" min="0" style={{ padding: "6px 8px" }}
+                      value={cantidades[it.Codigo_Articulo]}
+                      onChange={(e) => setCantidades(prev => ({ ...prev, [it.Codigo_Articulo]: e.target.value }))} />
+                  </td>
+                </tr>
+              ))}</tbody>
+            </table>
+          </div>
+          <div className="pcx-grid-2" style={{ marginBottom: 10 }}>
+            <select className="pcx-select" value={estatus} onChange={(e) => setEstatus(e.target.value)}>{ESTATUS.map(s => <option key={s}>{s}</option>)}</select>
+            <input className="pcx-input" placeholder="Comentario (opcional)" value={comentario} onChange={(e) => setComentario(e.target.value)} />
+          </div>
+          <button className="pcx-btn pcx-btn-primary" onClick={guardar} disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ExistenciasAdminTab({ call, post, notify }) {
+  const [items, setItems] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+  const [uploading, setUploading] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setItems(await call({ action: "getExistencias" })); }
+    catch (e) { notify(e.message); } finally { setLoading(false); }
+  }, [call, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    if (!q.trim()) return items;
+    const s = q.trim().toLowerCase();
+    return items.filter(it => String(it.Codigo).toLowerCase().includes(s) || String(it.Descripcion).toLowerCase().includes(s));
+  }, [items, q]);
+
+  const handleFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const buf = await file.arrayBuffer();
+      const wb = XLSX.read(buf, { type: "array" });
+      const wsName = wb.SheetNames.find(n => n.toLowerCase().includes("existenc")) || wb.SheetNames[0];
+      const raw = XLSX.utils.sheet_to_json(wb.Sheets[wsName], { defval: "" });
+      const mapped = raw.map(r => {
+        const get = (...keys) => { for (const k of keys) { if (r[k] !== undefined && r[k] !== "") return r[k]; } return ""; };
+        return {
+          Codigo: get("Codigo", "Código", "ID Artículo", "ID Articulo"),
+          Descripcion: get("Descripcion", "Descripción", "Nombre artículo", "Nombre articulo"),
+          Existencias: get("Existencias"), Unidad: get("Unidad", "Unidad de medida"),
+          Norma_Empaque: get("Norma_Empaque", "Norma de empaque"), Costo: get("Costo"), Zona_CEDIS: get("Zona_CEDIS", "Zona"),
+        };
+      }).filter(r => r.Codigo);
+      if (mapped.length === 0) { notify("No se encontraron filas válidas en el archivo"); setUploading(false); return; }
+      await post({ action: "cargarExistencias", items: mapped });
+      notify(`Existencias actualizadas: ${mapped.length} artículos`);
+      load();
+    } catch (e) { notify("Error al procesar el archivo: " + e.message); }
+    finally { setUploading(false); e.target.value = ""; }
+  };
+
+  return (
+    <div>
+      <div className="pcx-card">
+        <div className="pcx-h2">Cargar nuevas existencias</div>
+        <p className="pcx-muted" style={{ marginBottom: 10 }}>Sube tu archivo de existencias del CEDIS (.xlsx). Esto reemplaza todo el catálogo actual.</p>
+        <label className="pcx-btn pcx-btn-accent" style={{ cursor: "pointer" }}>
+          ⬆️ {uploading ? "Procesando..." : "Elegir archivo Excel"}
+          <input type="file" accept=".xlsx,.xls" onChange={handleFile} style={{ display: "none" }} disabled={uploading} />
+        </label>
+      </div>
+      <div className="pcx-search-row"><span>🔍</span>
+        <input className="pcx-input" placeholder="Buscar por código o descripción..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="pcx-card">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+          <div className="pcx-h2" style={{ margin: 0 }}>Catálogo actual ({items.length})</div>
+          <button className="pcx-btn pcx-btn-ghost" onClick={load}>🔄</button>
+        </div>
+        {loading && <div className="pcx-empty">Cargando...</div>}
+        <div className="pcx-table-wrap" style={{ maxHeight: 420, overflowY: "auto" }}>
+          <table className="pcx-table">
+            <thead><tr><th>Código</th><th>Descripción</th><th>Existencias</th><th>Unidad</th></tr></thead>
+            <tbody>{filtered.slice(0, 300).map((it, idx) => (
+              <tr key={idx}><td>{it.Codigo}</td><td>{it.Descripcion}</td><td>{it.Existencias}</td><td>{it.Unidad}</td></tr>
+            ))}</tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<App />);
+</script>
+</body>
+</html>
