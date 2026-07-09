@@ -90,6 +90,7 @@
 const { useState, useEffect, useMemo, useCallback } = React;
 
 const ADMIN_PIN = "NETO-2026"; // Cambia este código si quieres otro PIN de administrador
+const DEFAULT_API_URL = "https://script.google.com/macros/s/AKfycbzHbJIAE5w6tiAss-NlSHeohk7Vy-Scd1anRAn7bDoYjzcNSf7bgq2phm4L5Qz4JRVK/exec"; // URL fija del Apps Script, ya no hace falta capturarla
 
 const ESTATUS = ["Pendiente", "Confirmado", "En tránsito", "Entregado", "Cancelado"];
 const ESTATUS_STYLE = {
@@ -112,9 +113,9 @@ function StatusBadge({ estatus }) {
 }
 
 function App() {
-  const [apiUrl, setApiUrl] = useState(localStorage.getItem("cedis_api_url") || "");
-  const [apiUrlInput, setApiUrlInput] = useState(localStorage.getItem("cedis_api_url") || "");
-  const [showConfig, setShowConfig] = useState(!localStorage.getItem("cedis_api_url"));
+  const [apiUrl, setApiUrl] = useState(localStorage.getItem("cedis_api_url") || DEFAULT_API_URL);
+  const [apiUrlInput, setApiUrlInput] = useState(localStorage.getItem("cedis_api_url") || DEFAULT_API_URL);
+  const [showConfig, setShowConfig] = useState(false);
   const [role, setRole] = useState(null);
   const [toast, setToast] = useState("");
 
