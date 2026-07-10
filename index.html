@@ -291,8 +291,10 @@ function CatalogoTab({ tienda, call, post, notify }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
-  const [cart, setCart] = useState({});
+  const [cart, setCart] = useState({}); // codigo -> { item, cajas: string }
   const [sending, setSending] = useState(false);
+  const [step, setStep] = useState("seleccion"); // 'seleccion' | 'resumen'
+  const [confirmando, setConfirmando] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -309,38 +311,87 @@ function CatalogoTab({ tienda, call, post, notify }) {
   }, [items, q]);
 
   const normaDe = (item) => { const n = Number(item.Norma_Empaque); return n > 0 ? n : 1; };
+  const cajasNum = (c) => Math.max(0, parseInt(c.cajas) || 0);
 
-  const addToCart = (item) => setCart(prev => ({ ...prev, [item.Codigo]: { item, cajas: 1 } }));
+  const addToCart = (item) => setCart(prev => ({ ...prev, [item.Codigo]: { item, cajas: "1" } }));
   const changeQty = (codigo, delta) => setCart(prev => {
     const cur = prev[codigo]; if (!cur) return prev;
-    const next = cur.cajas + delta;
-    if (next <= 0) { const c = { ...prev }; delete c[codigo]; return c; }
-    return { ...prev, [codigo]: { ...cur, cajas: next } };
+    const next = Math.max(0, (parseInt(cur.cajas) || 0) + delta);
+    return { ...prev, [codigo]: { ...cur, cajas: String(next) } };
   });
+  // Mientras el gerente escribe se permite dejar el campo vacío o borrar todo sin que
+  // el artículo desaparezca del pedido; solo se limpia al salir del campo (onBlur) si quedó en 0.
   const setQtyManual = (codigo, value) => setCart(prev => {
     const cur = prev[codigo]; if (!cur) return prev;
-    const n = Math.max(0, parseInt(value) || 0);
+    if (!/^\d*$/.test(value)) return prev; // solo dígitos
+    return { ...prev, [codigo]: { ...cur, cajas: value } };
+  });
+  const onQtyBlur = (codigo) => setCart(prev => {
+    const cur = prev[codigo]; if (!cur) return prev;
+    const n = parseInt(cur.cajas) || 0;
     if (n <= 0) { const c = { ...prev }; delete c[codigo]; return c; }
-    return { ...prev, [codigo]: { ...cur, cajas: n } };
+    return { ...prev, [codigo]: { ...cur, cajas: String(n) } };
   });
   const removeFromCart = (codigo) => setCart(prev => { const c = { ...prev }; delete c[codigo]; return c; });
 
   const cartList = Object.values(cart);
-  const cartCajas = cartList.reduce((a, c) => a + c.cajas, 0);
+  const cartCajas = cartList.reduce((a, c) => a + cajasNum(c), 0);
 
   const enviarPedido = async () => {
-    if (cartList.length === 0) return;
     setSending(true);
     try {
       const res = await post({ action: "crearPedido", eco: tienda.ECO,
         items: cartList.map(c => ({
           Codigo: c.item.Codigo, Descripcion: c.item.Descripcion,
-          NormaEmpaque: normaDe(c.item), Cajas: c.cajas, Cantidad: c.cajas * normaDe(c.item),
+          NormaEmpaque: normaDe(c.item), Cajas: cajasNum(c), Cantidad: cajasNum(c) * normaDe(c.item),
         })) });
       notify(`Pedido enviado. Tu folio es ${res.folio}`);
-      setCart({});
+      setCart({}); setStep("seleccion"); setConfirmando(false);
     } catch (e) { notify(e.message); } finally { setSending(false); }
   };
+
+  if (step === "resumen") {
+    return (
+      <div>
+        <div className="pcx-card">
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+            <div className="pcx-h2" style={{ margin: 0 }}>Resumen de tu pedido</div>
+            <span className="pcx-link" onClick={() => setStep("seleccion")}>← Seguir eligiendo</span>
+          </div>
+          <p className="pcx-muted">{cartCajas} {cartCajas === 1 ? "caja" : "cajas"} en total, {cartList.length} {cartList.length === 1 ? "artículo" : "artículos"}</p>
+        </div>
+
+        <div className="pcx-card">
+          {cartList.map(c => (
+            <div className="pcx-item-row" key={c.item.Codigo}>
+              <div>
+                <div className="pcx-item-name">{c.item.Descripcion}</div>
+                <div className="pcx-item-meta">{cajasNum(c)} {cajasNum(c) === 1 ? "caja" : "cajas"} × {normaDe(c.item)} pzas = {cajasNum(c) * normaDe(c.item)} piezas</div>
+              </div>
+              <button className="pcx-btn pcx-btn-danger" onClick={() => removeFromCart(c.item.Codigo)}>🗑️</button>
+            </div>
+          ))}
+        </div>
+
+        <button className="pcx-btn pcx-btn-accent pcx-btn-block" onClick={() => setConfirmando(true)} disabled={cartList.length === 0}>
+          Enviar pedido
+        </button>
+
+        {confirmando && (
+          <div className="pcx-card" style={{ borderColor: "var(--accent)", background: "#FFF8EF", marginTop: 12 }}>
+            <div style={{ fontWeight: 800, fontSize: 14.5, marginBottom: 6 }}>📦 Recuerda: tu pedido está capturado en cajas, no en piezas</div>
+            <p className="pcx-muted" style={{ marginBottom: 12 }}>Revisa que las cantidades de arriba sean correctas. ¿Confirmas que quieres enviar este pedido?</p>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="pcx-btn pcx-btn-primary" onClick={enviarPedido} disabled={sending}>
+                {sending ? "Enviando..." : "Sí, enviar pedido"}
+              </button>
+              <button className="pcx-btn pcx-btn-ghost" onClick={() => setConfirmando(false)} disabled={sending}>Cancelar</button>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -361,8 +412,9 @@ function CatalogoTab({ tienda, call, post, notify }) {
             {cart[it.Codigo] ? (
               <div className="pcx-qtybox">
                 <button onClick={() => changeQty(it.Codigo, -1)}>−</button>
-                <input type="number" min="1" value={cart[it.Codigo].cajas}
+                <input type="text" inputMode="numeric" value={cart[it.Codigo].cajas}
                   onChange={(e) => setQtyManual(it.Codigo, e.target.value)}
+                  onBlur={() => onQtyBlur(it.Codigo)}
                   style={{ width: 52, textAlign: "center", border: "1.5px solid var(--border)", borderRadius: 8, padding: "4px 2px", fontWeight: 700, fontSize: 13.5 }} />
                 <button onClick={() => changeQty(it.Codigo, 1)}>+</button>
               </div>
@@ -373,17 +425,8 @@ function CatalogoTab({ tienda, call, post, notify }) {
       {cartCajas > 0 && (
         <div className="pcx-card" style={{ borderColor: "var(--accent)", position: "sticky", bottom: 12 }}>
           <div className="pcx-h2">Tu pedido ({cartCajas} {cartCajas === 1 ? "caja" : "cajas"})</div>
-          {cartList.map(c => (
-            <div className="pcx-item-row" key={c.item.Codigo}>
-              <div>
-                <div className="pcx-item-name">{c.item.Descripcion}</div>
-                <div className="pcx-item-meta">{c.cajas} {c.cajas === 1 ? "caja" : "cajas"} × {normaDe(c.item)} pzas = {c.cajas * normaDe(c.item)} piezas</div>
-              </div>
-              <button className="pcx-btn pcx-btn-danger" onClick={() => removeFromCart(c.item.Codigo)}>🗑️</button>
-            </div>
-          ))}
-          <button className="pcx-btn pcx-btn-accent pcx-btn-block" style={{ marginTop: 10 }} onClick={enviarPedido} disabled={sending}>
-            {sending ? "Enviando..." : "Enviar pedido"}
+          <button className="pcx-btn pcx-btn-accent pcx-btn-block" onClick={() => setStep("resumen")}>
+            Terminar pedido
           </button>
         </div>
       )}
