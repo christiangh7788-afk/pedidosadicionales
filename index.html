@@ -308,27 +308,35 @@ function CatalogoTab({ tienda, call, post, notify }) {
     return items.filter(it => String(it.Codigo).toLowerCase().includes(s) || String(it.Descripcion).toLowerCase().includes(s));
   }, [items, q]);
 
-  const addToCart = (item) => setCart(prev => {
-    const cur = prev[item.Codigo];
-    return { ...prev, [item.Codigo]: { item, cantidad: cur ? cur.cantidad + 1 : 1 } };
-  });
+  const normaDe = (item) => { const n = Number(item.Norma_Empaque); return n > 0 ? n : 1; };
+
+  const addToCart = (item) => setCart(prev => ({ ...prev, [item.Codigo]: { item, cajas: 1 } }));
   const changeQty = (codigo, delta) => setCart(prev => {
     const cur = prev[codigo]; if (!cur) return prev;
-    const next = cur.cantidad + delta;
+    const next = cur.cajas + delta;
     if (next <= 0) { const c = { ...prev }; delete c[codigo]; return c; }
-    return { ...prev, [codigo]: { ...cur, cantidad: next } };
+    return { ...prev, [codigo]: { ...cur, cajas: next } };
+  });
+  const setQtyManual = (codigo, value) => setCart(prev => {
+    const cur = prev[codigo]; if (!cur) return prev;
+    const n = Math.max(0, parseInt(value) || 0);
+    if (n <= 0) { const c = { ...prev }; delete c[codigo]; return c; }
+    return { ...prev, [codigo]: { ...cur, cajas: n } };
   });
   const removeFromCart = (codigo) => setCart(prev => { const c = { ...prev }; delete c[codigo]; return c; });
 
   const cartList = Object.values(cart);
-  const cartCount = cartList.reduce((a, c) => a + c.cantidad, 0);
+  const cartCajas = cartList.reduce((a, c) => a + c.cajas, 0);
 
   const enviarPedido = async () => {
     if (cartList.length === 0) return;
     setSending(true);
     try {
       const res = await post({ action: "crearPedido", eco: tienda.ECO,
-        items: cartList.map(c => ({ Codigo: c.item.Codigo, Descripcion: c.item.Descripcion, Cantidad: c.cantidad })) });
+        items: cartList.map(c => ({
+          Codigo: c.item.Codigo, Descripcion: c.item.Descripcion,
+          NormaEmpaque: normaDe(c.item), Cajas: c.cajas, Cantidad: c.cajas * normaDe(c.item),
+        })) });
       notify(`Pedido enviado. Tu folio es ${res.folio}`);
       setCart({});
     } catch (e) { notify(e.message); } finally { setSending(false); }
@@ -346,24 +354,31 @@ function CatalogoTab({ tienda, call, post, notify }) {
           <div className="pcx-item-row" key={it.Codigo}>
             <div style={{ minWidth: 0 }}>
               <div className="pcx-item-name">{it.Descripcion}</div>
-              <div className="pcx-item-meta">Código {it.Codigo} · Disponible: {it.Existencias} {it.Unidad || ""}</div>
+              <div className="pcx-item-meta">
+                Código {it.Codigo} · Norma de empaque: {normaDe(it)} pzas/caja · Disponible: {it.Existencias} {it.Unidad || ""}
+              </div>
             </div>
             {cart[it.Codigo] ? (
               <div className="pcx-qtybox">
                 <button onClick={() => changeQty(it.Codigo, -1)}>−</button>
-                <span>{cart[it.Codigo].cantidad}</span>
+                <input type="number" min="1" value={cart[it.Codigo].cajas}
+                  onChange={(e) => setQtyManual(it.Codigo, e.target.value)}
+                  style={{ width: 52, textAlign: "center", border: "1.5px solid var(--border)", borderRadius: 8, padding: "4px 2px", fontWeight: 700, fontSize: 13.5 }} />
                 <button onClick={() => changeQty(it.Codigo, 1)}>+</button>
               </div>
             ) : <button className="pcx-btn pcx-btn-ghost" onClick={() => addToCart(it)}>+ Agregar</button>}
           </div>
         ))}
       </div>
-      {cartCount > 0 && (
+      {cartCajas > 0 && (
         <div className="pcx-card" style={{ borderColor: "var(--accent)", position: "sticky", bottom: 12 }}>
-          <div className="pcx-h2">Tu pedido ({cartCount} {cartCount === 1 ? "artículo" : "artículos"})</div>
+          <div className="pcx-h2">Tu pedido ({cartCajas} {cartCajas === 1 ? "caja" : "cajas"})</div>
           {cartList.map(c => (
             <div className="pcx-item-row" key={c.item.Codigo}>
-              <div><div className="pcx-item-name">{c.item.Descripcion}</div><div className="pcx-item-meta">Cantidad: {c.cantidad}</div></div>
+              <div>
+                <div className="pcx-item-name">{c.item.Descripcion}</div>
+                <div className="pcx-item-meta">{c.cajas} {c.cajas === 1 ? "caja" : "cajas"} × {normaDe(c.item)} pzas = {c.cajas * normaDe(c.item)} piezas</div>
+              </div>
               <button className="pcx-btn pcx-btn-danger" onClick={() => removeFromCart(c.item.Codigo)}>🗑️</button>
             </div>
           ))}
@@ -410,8 +425,9 @@ function MisPedidosTab({ tienda, call, notify }) {
           <div className="pcx-muted" style={{ marginBottom: 6 }}>{f.fecha}</div>
           {f.items.map((it, idx) => (
             <div key={idx} style={{ fontSize: 13, padding: "4px 0", borderTop: idx === 0 ? "none" : "1px dashed var(--border)" }}>
-              {it.Descripcion} — {it.Cantidad_Solicitada}
-              {it.Cantidad_Confirmada !== "" && it.Cantidad_Confirmada !== undefined && Number(it.Cantidad_Confirmada) !== Number(it.Cantidad_Solicitada) ? ` (confirmado: ${it.Cantidad_Confirmada})` : ""}
+              {it.Descripcion} — {it.Cajas_Solicitadas} {Number(it.Cajas_Solicitadas) === 1 ? "caja" : "cajas"} ({it.Cantidad_Solicitada} pzas)
+              {it.Cajas_Confirmadas !== "" && it.Cajas_Confirmadas !== undefined && Number(it.Cajas_Confirmadas) !== Number(it.Cajas_Solicitadas)
+                ? ` — confirmado: ${it.Cajas_Confirmadas} cajas (${it.Cantidad_Confirmada} pzas)` : ""}
             </div>
           ))}
         </div>
@@ -470,8 +486,10 @@ function ResumenTab({ call, notify }) {
     XLSX.utils.book_append_sheet(wb, wsResumen, "Resumen por tienda");
     const wsDetalle = XLSX.utils.json_to_sheet(pedidos.map(p => ({
       Folio: p.Folio, Fecha: p.Fecha_Solicitud, ECO: p.ECO, Tienda: p.Tienda, Region: p.Region, Zona: p.Zona,
-      Codigo: p.Codigo_Articulo, Descripcion: p.Descripcion, "Cant. solicitada": p.Cantidad_Solicitada,
-      "Cant. confirmada": p.Cantidad_Confirmada, Estatus: p.Estatus, "Fecha estatus": p.Fecha_Estatus, Comentario: p.Comentario_Admin,
+      Codigo: p.Codigo_Articulo, Descripcion: p.Descripcion, "Norma empaque": p.Norma_Empaque,
+      "Cajas solicitadas": p.Cajas_Solicitadas, "Piezas solicitadas": p.Cantidad_Solicitada,
+      "Cajas confirmadas": p.Cajas_Confirmadas, "Piezas confirmadas": p.Cantidad_Confirmada,
+      Estatus: p.Estatus, "Fecha estatus": p.Fecha_Estatus, Comentario: p.Comentario_Admin,
     })));
     XLSX.utils.book_append_sheet(wb, wsDetalle, "Detalle de pedidos");
     XLSX.writeFile(wb, `Resumen_Pedidos_CEDIS_${new Date().toISOString().slice(0,10)}.xlsx`);
@@ -573,15 +591,21 @@ function FolioAdminCard({ folio, post, notify, onSaved }) {
   const [open, setOpen] = useState(false);
   const [estatus, setEstatus] = useState(folio.estatus);
   const [comentario, setComentario] = useState("");
-  const [cantidades, setCantidades] = useState(() => {
-    const o = {}; folio.items.forEach(it => { o[it.Codigo_Articulo] = it.Cantidad_Confirmada || it.Cantidad_Solicitada; }); return o;
+  const [cajasConf, setCajasConf] = useState(() => {
+    const o = {}; folio.items.forEach(it => { o[it.Codigo_Articulo] = it.Cajas_Confirmadas || it.Cajas_Solicitadas || 0; }); return o;
   });
   const [saving, setSaving] = useState(false);
 
   const guardar = async () => {
     setSaving(true);
     try {
-      await post({ action: "actualizarEstatus", folio: folio.folio, estatus, comentario, cantidadesConfirmadas: cantidades });
+      const cantidadesConfirmadas = {};
+      folio.items.forEach(it => {
+        const norma = Number(it.Norma_Empaque) || 1;
+        const cajas = Number(cajasConf[it.Codigo_Articulo]) || 0;
+        cantidadesConfirmadas[it.Codigo_Articulo] = { Cajas: cajas, Piezas: cajas * norma };
+      });
+      await post({ action: "actualizarEstatus", folio: folio.folio, estatus, comentario, cantidadesConfirmadas });
       notify(`Folio ${folio.folio} actualizado a "${estatus}"`);
       onSaved();
     } catch (e) { notify(e.message); } finally { setSaving(false); }
@@ -597,16 +621,23 @@ function FolioAdminCard({ folio, post, notify, onSaved }) {
         <div style={{ marginTop: 10 }}>
           <div className="pcx-table-wrap" style={{ marginBottom: 10 }}>
             <table className="pcx-table">
-              <thead><tr><th>Código</th><th>Descripción</th><th>Solicitado</th><th>Confirmar</th></tr></thead>
-              <tbody>{folio.items.map((it, idx) => (
-                <tr key={idx}><td>{it.Codigo_Articulo}</td><td>{it.Descripcion}</td><td>{it.Cantidad_Solicitada}</td>
-                  <td style={{ width: 90 }}>
-                    <input className="pcx-input" type="number" min="0" style={{ padding: "6px 8px" }}
-                      value={cantidades[it.Codigo_Articulo]}
-                      onChange={(e) => setCantidades(prev => ({ ...prev, [it.Codigo_Articulo]: e.target.value }))} />
-                  </td>
-                </tr>
-              ))}</tbody>
+              <thead><tr><th>Código</th><th>Descripción</th><th>Norma</th><th>Cajas sol.</th><th>Piezas sol.</th><th>Cajas a confirmar</th></tr></thead>
+              <tbody>{folio.items.map((it, idx) => {
+                const norma = Number(it.Norma_Empaque) || 1;
+                const cajas = Number(cajasConf[it.Codigo_Articulo]) || 0;
+                return (
+                  <tr key={idx}>
+                    <td>{it.Codigo_Articulo}</td><td>{it.Descripcion}</td><td>{norma}</td>
+                    <td>{it.Cajas_Solicitadas}</td><td>{it.Cantidad_Solicitada}</td>
+                    <td style={{ width: 120 }}>
+                      <input className="pcx-input" type="number" min="0" style={{ padding: "6px 8px" }}
+                        value={cajasConf[it.Codigo_Articulo]}
+                        onChange={(e) => setCajasConf(prev => ({ ...prev, [it.Codigo_Articulo]: e.target.value }))} />
+                      <div className="pcx-muted" style={{ fontSize: 11, marginTop: 2 }}>{cajas * norma} pzas</div>
+                    </td>
+                  </tr>
+                );
+              })}</tbody>
             </table>
           </div>
           <div className="pcx-grid-2" style={{ marginBottom: 10 }}>
@@ -652,10 +683,17 @@ function ExistenciasAdminTab({ call, post, notify }) {
       const mapped = raw.map(r => {
         const get = (...keys) => { for (const k of keys) { if (r[k] !== undefined && r[k] !== "") return r[k]; } return ""; };
         return {
-          Codigo: get("Codigo", "Código", "ID Artículo", "ID Articulo"),
-          Descripcion: get("Descripcion", "Descripción", "Nombre artículo", "Nombre articulo"),
-          Existencias: get("Existencias"), Unidad: get("Unidad", "Unidad de medida"),
-          Norma_Empaque: get("Norma_Empaque", "Norma de empaque"), Costo: get("Costo"), Zona_CEDIS: get("Zona_CEDIS", "Zona"),
+          Cedis: get("Cedis"),
+          Codigo: get("ID Artículo", "ID Articulo", "Codigo", "Código"),
+          Descripcion: get("Nombre artículo", "Nombre articulo", "Descripcion", "Descripción"),
+          Estatus: get("Estatus"),
+          Tipo: get("Tipo artículo", "Tipo articulo"),
+          Existencias: get("Existencias"),
+          Unidad: get("Unidad de medida", "Unidad"),
+          Norma_Empaque: get("Norma de empaque", "Norma_Empaque"),
+          Costo: get("Costo"),
+          Zona_CEDIS: get("Zona", "Zona_CEDIS"),
+          Ubicacion: get("Ubicación", "Ubicacion"),
         };
       }).filter(r => r.Codigo);
       if (mapped.length === 0) { notify("No se encontraron filas válidas en el archivo"); setUploading(false); return; }
@@ -687,9 +725,9 @@ function ExistenciasAdminTab({ call, post, notify }) {
         {loading && <div className="pcx-empty">Cargando...</div>}
         <div className="pcx-table-wrap" style={{ maxHeight: 420, overflowY: "auto" }}>
           <table className="pcx-table">
-            <thead><tr><th>Código</th><th>Descripción</th><th>Existencias</th><th>Unidad</th></tr></thead>
+            <thead><tr><th>Código</th><th>Descripción</th><th>Estatus</th><th>Existencias</th><th>Norma</th><th>Ubicación</th></tr></thead>
             <tbody>{filtered.slice(0, 300).map((it, idx) => (
-              <tr key={idx}><td>{it.Codigo}</td><td>{it.Descripcion}</td><td>{it.Existencias}</td><td>{it.Unidad}</td></tr>
+              <tr key={idx}><td>{it.Codigo}</td><td>{it.Descripcion}</td><td>{it.Estatus}</td><td>{it.Existencias}</td><td>{it.Norma_Empaque}</td><td>{it.Ubicacion}</td></tr>
             ))}</tbody>
           </table>
         </div>
