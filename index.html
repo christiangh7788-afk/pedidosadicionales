@@ -688,9 +688,11 @@ function GerenteDashboard({ tienda, call, post, notify, onExit }) {
       <div className="pcx-tabs">
         <div className={`pcx-tab ${tab === "catalogo" ? "active" : ""}`} onClick={() => setTab("catalogo")}>Solicitar mercancía</div>
         <div className={`pcx-tab ${tab === "pedidos" ? "active" : ""}`} onClick={() => setTab("pedidos")}>Mis pedidos</div>
+        <div className={`pcx-tab ${tab === "sinExistencia" ? "active" : ""}`} onClick={() => setTab("sinExistencia")}>Sin existencia en CEDIS</div>
       </div>
       {tab === "catalogo" && <CatalogoTab tienda={tienda} call={call} post={post} notify={notify} />}
       {tab === "pedidos" && <MisPedidosTab tienda={tienda} call={call} notify={notify} />}
+      {tab === "sinExistencia" && <SinExistenciaTab call={call} notify={notify} />}
     </div>
   );
 }
@@ -720,12 +722,19 @@ function CatalogoTab({ tienda, call, post, notify }) {
   }, [items, q]);
 
   const normaDe = (item) => { const n = Number(item.Norma_Empaque); return n > 0 ? n : 1; };
+  const maxCajasDe = (item) => Math.floor((Number(item.Existencias) || 0) / normaDe(item));
   const cajasNum = (c) => Math.max(0, parseInt(c.cajas) || 0);
 
-  const addToCart = (item) => setCart(prev => ({ ...prev, [item.Codigo]: { item, cajas: "1" } }));
+  const addToCart = (item) => {
+    const max = maxCajasDe(item);
+    if (max <= 0) { notify(`No hay suficiente existencia de "${item.Descripcion}" para completar ni una caja`); return; }
+    setCart(prev => ({ ...prev, [item.Codigo]: { item, cajas: "1" } }));
+  };
   const changeQty = (codigo, delta) => setCart(prev => {
     const cur = prev[codigo]; if (!cur) return prev;
-    const next = Math.max(0, (parseInt(cur.cajas) || 0) + delta);
+    const max = maxCajasDe(cur.item);
+    let next = Math.max(0, (parseInt(cur.cajas) || 0) + delta);
+    if (next > max) { notify(`Solo puedes pedir ${max} ${max === 1 ? "caja" : "cajas"} de "${cur.item.Descripcion}" (existencia: ${cur.item.Existencias} piezas)`); next = max; }
     return { ...prev, [codigo]: { ...cur, cajas: String(next) } };
   });
   // Mientras el gerente escribe se permite dejar el campo vacío o borrar todo sin que
@@ -737,7 +746,9 @@ function CatalogoTab({ tienda, call, post, notify }) {
   });
   const onQtyBlur = (codigo) => setCart(prev => {
     const cur = prev[codigo]; if (!cur) return prev;
-    const n = parseInt(cur.cajas) || 0;
+    let n = parseInt(cur.cajas) || 0;
+    const max = maxCajasDe(cur.item);
+    if (n > max) { notify(`Solo puedes pedir ${max} ${max === 1 ? "caja" : "cajas"} de "${cur.item.Descripcion}" (existencia: ${cur.item.Existencias} piezas)`); n = max; }
     if (n <= 0) { const c = { ...prev }; delete c[codigo]; return c; }
     return { ...prev, [codigo]: { ...cur, cajas: String(n) } };
   });
@@ -807,7 +818,7 @@ function CatalogoTab({ tienda, call, post, notify }) {
       <div className="pcx-search-row"><span>🔍</span>
         <input className="pcx-input" placeholder="Buscar por código o descripción..." value={q} onChange={(e) => setQ(e.target.value)} />
       </div>
-      <div className="pcx-card" style={{ maxHeight: 420, overflowY: "auto" }}>
+      <div className="pcx-card" style={{ maxHeight: "68vh", minHeight: 320, overflowY: "auto" }}>
         {loading && <div className="pcx-empty">Cargando existencias...</div>}
         {!loading && filtered.length === 0 && <div className="pcx-empty">Sin resultados</div>}
         {!loading && filtered.slice(0, 200).map((it) => (
@@ -858,8 +869,9 @@ function MisPedidosTab({ tienda, call, notify }) {
   const folios = useMemo(() => {
     const map = {};
     rows.forEach(r => {
-      if (!map[r.Folio]) map[r.Folio] = { folio: r.Folio, fecha: r.Fecha_Solicitud, estatus: r.Estatus, items: [] };
+      if (!map[r.Folio]) map[r.Folio] = { folio: r.Folio, fecha: r.Fecha_Solicitud, estatus: r.Estatus, comentario: "", items: [] };
       map[r.Folio].items.push(r); map[r.Folio].estatus = r.Estatus;
+      if (r.Comentario_Admin) map[r.Folio].comentario = r.Comentario_Admin;
     });
     return Object.values(map).sort((a, b) => (a.folio < b.folio ? 1 : -1));
   }, [rows]);
@@ -875,6 +887,11 @@ function MisPedidosTab({ tienda, call, notify }) {
         <div className="pcx-folio-card" key={f.folio}>
           <div className="pcx-folio-head"><div className="pcx-folio-id">{f.folio}</div><StatusBadge estatus={f.estatus} /></div>
           <div className="pcx-muted" style={{ marginBottom: 6 }}>{f.fecha}</div>
+          {f.comentario && (
+            <div style={{ background: "#FFF8EF", border: "1px solid #F2D9B8", borderRadius: 8, padding: "8px 10px", marginBottom: 8, fontSize: 12.5 }}>
+              💬 <strong>Mensaje del administrador:</strong> {f.comentario}
+            </div>
+          )}
           {f.items.map((it, idx) => (
             <div key={idx} style={{ fontSize: 13, padding: "4px 0", borderTop: idx === 0 ? "none" : "1px dashed var(--border)" }}>
               {it.Descripcion} — {it.Cajas_Solicitadas} {Number(it.Cajas_Solicitadas) === 1 ? "caja" : "cajas"} ({it.Cantidad_Solicitada} pzas)
@@ -884,6 +901,55 @@ function MisPedidosTab({ tienda, call, notify }) {
           ))}
         </div>
       ))}
+    </div>
+  );
+}
+
+function SinExistenciaTab({ call, notify }) {
+  const [rows, setRows] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [q, setQ] = useState("");
+
+  const load = useCallback(async () => {
+    setLoading(true);
+    try { setRows(await call({ action: "getSinExistencia" })); }
+    catch (e) { notify(e.message); } finally { setLoading(false); }
+  }, [call, notify]);
+
+  useEffect(() => { load(); }, [load]);
+
+  const filtered = useMemo(() => {
+    if (!q.trim()) return rows;
+    const s = q.trim().toLowerCase();
+    return rows.filter(r => String(r.Codigo).toLowerCase().includes(s) || String(r.Descripcion).toLowerCase().includes(s));
+  }, [rows, q]);
+
+  return (
+    <div>
+      <div className="pcx-card" style={{ borderColor: "#F2D3D0", background: "#FBEAEA" }}>
+        <div style={{ fontWeight: 700, fontSize: 13.5, marginBottom: 2 }}>🚫 Artículos sin existencia en todo el CEDIS</div>
+        <div className="pcx-muted">Esta lista la mantiene el administrador. No es lo mismo que "sin existencia" en tu tienda: son artículos que por ahora no están llegando al CEDIS.</div>
+      </div>
+      <div className="pcx-search-row"><span>🔍</span>
+        <input className="pcx-input" placeholder="Buscar por código o descripción..." value={q} onChange={(e) => setQ(e.target.value)} />
+      </div>
+      <div className="pcx-card">
+        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+          <button className="pcx-btn pcx-btn-ghost" onClick={load}>🔄 Actualizar</button>
+        </div>
+        {loading && <div className="pcx-empty">Cargando...</div>}
+        {!loading && filtered.length === 0 && <div className="pcx-empty">No hay artículos registrados en esta lista por ahora</div>}
+        {!loading && filtered.map((r, idx) => (
+          <div className="pcx-item-row" key={idx}>
+            <div>
+              <div className="pcx-item-name">{r.Descripcion}</div>
+              <div className="pcx-item-meta">
+                Código {r.Codigo}{r.Estatus ? ` · ${r.Estatus}` : ""}{r.Zona_CEDIS ? ` · Zona ${r.Zona_CEDIS}` : ""}{r.Ubicacion ? ` · Ubicación ${r.Ubicacion}` : ""}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
