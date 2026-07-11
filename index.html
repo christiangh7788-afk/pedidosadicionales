@@ -481,21 +481,13 @@ function StatusBadge({ estatus }) {
 }
 
 function App() {
-  const [apiUrl, setApiUrl] = useState(localStorage.getItem("cedis_api_url") || DEFAULT_API_URL);
-  const [apiUrlInput, setApiUrlInput] = useState(localStorage.getItem("cedis_api_url") || DEFAULT_API_URL);
-  const [showConfig, setShowConfig] = useState(false);
+  const apiUrl = DEFAULT_API_URL;
   const [role, setRole] = useState(null);
   const [toast, setToast] = useState("");
 
   const notify = useCallback((msg) => setToast(msg), []);
 
-  const saveApiUrl = (url) => {
-    setApiUrl(url);
-    localStorage.setItem("cedis_api_url", url);
-  };
-
   const call = useCallback(async (params) => {
-    if (!apiUrl) throw new Error("Primero configura la URL del sistema (ícono de engranaje).");
     const url = apiUrl + "?" + new URLSearchParams(params).toString();
     const res = await fetch(url);
     const data = await res.json();
@@ -504,7 +496,6 @@ function App() {
   }, [apiUrl]);
 
   const post = useCallback(async (body) => {
-    if (!apiUrl) throw new Error("Primero configura la URL del sistema (ícono de engranaje).");
     const res = await fetch(apiUrl, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
@@ -524,32 +515,10 @@ function App() {
         </div>
         <div style={{ display: "flex", gap: 8 }}>
           {role && <button className="pcx-iconbtn" onClick={() => setRole(null)} title="Salir">🚪</button>}
-          <button className="pcx-iconbtn" onClick={() => setShowConfig(true)} title="Configuración">⚙️</button>
         </div>
       </div>
 
-      {showConfig && (
-        <div className="pcx-card" style={{ borderColor: "var(--primary)" }}>
-          <div className="pcx-h2">Configuración del sistema</div>
-          <p className="pcx-muted" style={{ marginBottom: 10 }}>Pega la URL de tu Google Apps Script (Web App), termina en /exec. Se guarda en este navegador.</p>
-          <input className="pcx-input" placeholder="https://script.google.com/macros/s/AKfycb.../exec"
-            value={apiUrlInput} onChange={(e) => setApiUrlInput(e.target.value)} style={{ marginBottom: 10 }} />
-          <div style={{ display: "flex", gap: 8 }}>
-            <button className="pcx-btn pcx-btn-primary" disabled={!apiUrlInput.trim()}
-              onClick={() => { saveApiUrl(apiUrlInput.trim()); setShowConfig(false); notify("URL guardada"); }}>Guardar</button>
-            {apiUrl && <button className="pcx-btn pcx-btn-ghost" onClick={() => setShowConfig(false)}>Cancelar</button>}
-          </div>
-        </div>
-      )}
-
-      {!apiUrl && !showConfig && (
-        <div className="pcx-card" style={{ borderColor: "#F2D9B8", background: "#FFF8EF" }}>
-          <div style={{ fontWeight: 700, fontSize: 13.5 }}>⚠️ Falta configurar el sistema</div>
-          <div className="pcx-muted">Toca ⚙️ arriba y pega la URL de tu Apps Script.</div>
-        </div>
-      )}
-
-      {!role && apiUrl && !showConfig && <RoleSelect onSelect={setRole} />}
+      {!role && <RoleSelect onSelect={setRole} />}
       {role === "gerente" && <GerenteFlow call={call} post={post} notify={notify} onExit={() => setRole(null)} />}
       {role === "admin" && <AdminFlow call={call} post={post} notify={notify} onExit={() => setRole(null)} />}
 
