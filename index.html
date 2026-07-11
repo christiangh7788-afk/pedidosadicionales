@@ -682,6 +682,11 @@ function GerenteDashboard({ tienda, call, post, notify, onExit }) {
         <div>
           <div style={{ fontWeight: 800, fontSize: 15.5 }}>{tienda.Nombre_Tienda}</div>
           <div className="pcx-muted">ECO {tienda.ECO} · {tienda.Zona} · {tienda.Region}</div>
+          {tienda.Dias_Pedido && (
+            <div style={{ marginTop: 6, display: "inline-flex", alignItems: "center", gap: 6, background: "#E8F0FB", color: "var(--primary)", borderRadius: 999, padding: "4px 12px", fontSize: 12, fontWeight: 700 }}>
+              📅 Días de pedido: {tienda.Dias_Pedido}
+            </div>
+          )}
         </div>
         <span className="pcx-link" onClick={onExit}>Cambiar tienda</span>
       </div>
